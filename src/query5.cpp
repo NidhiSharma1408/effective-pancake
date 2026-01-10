@@ -187,34 +187,62 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
         }
     }
 
-    for (const auto &row : lineitem_data)
+    vector<thread> threads;
+    vector<map<string, double>> local_results(num_threads);
+
+    auto worker = [&](int t_id, size_t start, size_t end)
     {
-        const string &order_key = row.at("L_ORDERKEY");
-        auto order_customer_object = filtered_orders_customer_map.find(order_key);
-
-        if (order_customer_object != filtered_orders_customer_map.end())
+        for (size_t i = start; i < end; ++i)
         {
-            const string &supp_key = row.at("L_SUPPKEY");
+            const auto &row = lineitem_data[i];
+            const string &order_key = row.at("L_ORDERKEY");
+            auto order_customer_object = filtered_orders_customer_map.find(order_key);
 
-            auto suplier_nation_object = supplier_nation_map.find(supp_key);
-            if (suplier_nation_object != supplier_nation_map.end())
+            if (order_customer_object != filtered_orders_customer_map.end())
             {
+                const string &supp_key = row.at("L_SUPPKEY");
 
-                const string &cust_key = order_customer_object->second;
-                const string &cust_nation_key = customer_nation_map[cust_key];
-                const string &supp_nation_key = suplier_nation_object->second;
+                auto suplier_nation_object = supplier_nation_map.find(supp_key);
+                if (suplier_nation_object != supplier_nation_map.end())
+                {
 
-                if (cust_nation_key != supp_nation_key)
-                    continue;
+                    const string &cust_key = order_customer_object->second;
+                    const string &cust_nation_key = customer_nation_map[cust_key];
+                    const string &supp_nation_key = suplier_nation_object->second;
 
-                double extended_price = stod(row.at("L_EXTENDEDPRICE"));
-                double discount = stod(row.at("L_DISCOUNT"));
-                double revenue = extended_price * (1 - discount);
+                    if (cust_nation_key != supp_nation_key)
+                        continue;
 
-                const string &nation_name = nation_name_map[supplier_nation_map[supp_key]];
+                    double extended_price = stod(row.at("L_EXTENDEDPRICE"));
+                    double discount = stod(row.at("L_DISCOUNT"));
+                    double revenue = extended_price * (1 - discount);
 
-                results[nation_name] += revenue;
+                    const string &nation_name = nation_name_map[supplier_nation_map[supp_key]];
+
+                    local_results[t_id][nation_name] += revenue;
+                }
             }
+        }
+    };
+
+    size_t partition_size = lineitem_data.size() / num_threads;
+    for (int t = 0; t < num_threads; t++)
+    {
+        size_t start = t * partition_size;
+        size_t end = (t == num_threads - 1) ? lineitem_data.size() : start + partition_size;
+        threads.emplace_back(worker, t, start, end);
+    }
+
+    for (auto &th : threads)
+    {
+        th.join();
+    }
+
+    for (const auto &local_map : local_results)
+    {
+        for (const auto &entry : local_map)
+        {
+            results[entry.first] += entry.second;
         }
     }
 
@@ -224,6 +252,23 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
 // Function to output results to the specified path
 bool outputResults(const string &result_path, const map<string, double> &results)
 {
-    // TODO: Implement outputting results to a file
+    ofstream result_file(result_path);
+
+    if (result_file.is_open())
+    {
+        vector<pair<string, double>> sorted_results(results.begin(), results.end());
+        sort(sorted_results.begin(), sorted_results.end(), [](const pair<string, double> &a, const pair<string, double> &b)
+             { return a.second > b.second; });
+
+        for (const auto &entry : sorted_results)
+        {
+            result_file << entry.first << "|" << entry.second << endl;
+        }
+
+        result_file.close();
+
+        return true;
+    }
+
     return false;
 }
