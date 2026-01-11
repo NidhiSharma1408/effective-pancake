@@ -137,6 +137,7 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
         return false;
 
     unordered_map<string, string> nation_name_map;
+    nation_name_map.reserve(nation_data.size() / region_data.size());
     for (const auto &row : nation_data)
     {
         if (row.at("N_REGIONKEY") == region_key)
@@ -146,6 +147,7 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
     }
 
     unordered_map<string, string> supplier_nation_map;
+    supplier_nation_map.reserve(supplier_data.size() / nation_data.size());
     for (const auto &row : supplier_data)
     {
         const string &nation_key = row.at("S_NATIONKEY");
@@ -156,6 +158,8 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
     }
 
     unordered_map<string, string> customer_nation_map;
+    customer_nation_map.reserve(customer_data.size() / nation_data.size());
+
     for (const auto &row : customer_data)
     {
         const string &nation_key = row.at("C_NATIONKEY");
@@ -170,7 +174,9 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
     time_t t_start = mktime(&tm_start);
     time_t t_end = mktime(&tm_end);
 
-    map<string, string> filtered_orders_customer_map;
+    unordered_map<string, string> filtered_orders_customer_map;
+    filtered_orders_customer_map.reserve(orders_data.size() / 10);
+
     for (const auto &row : orders_data)
     {
 
@@ -188,7 +194,12 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
     }
 
     vector<thread> threads;
-    vector<map<string, double>> local_results(num_threads);
+    vector<unordered_map<string, double>> local_results(num_threads);
+
+    for (auto &local_map : local_results)
+    {
+        local_map.reserve(nation_name_map.size());
+    }
 
     auto worker = [&](int t_id, size_t start, size_t end)
     {
@@ -246,7 +257,7 @@ bool executeQuery5(const string &r_name, const string &start_date, const string 
         }
     }
 
-    return false;
+    return true;
 }
 
 // Function to output results to the specified path

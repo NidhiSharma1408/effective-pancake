@@ -4,6 +4,7 @@ project(tpch_query5 LANGUAGES CXX)
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
 
 # Add executable target
 add_executable(tpch_query5 src/main.cpp src/query5.cpp)
